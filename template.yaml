@@ -255,6 +255,14 @@ Resources:
       Principal: "*"
       FunctionUrlAuthType: NONE
 
+  ArchiveUrlInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ArchiveFunction
+      Action: lambda:InvokeFunction
+      Principal: "*"
+      InvokedViaFunctionUrl: true
+
   SchedulerRole:
     Type: AWS::IAM::Role
     Properties:

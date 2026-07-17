@@ -23,25 +23,20 @@ flowchart TD
     L --> SNS["SNS"] --> INBOX(["your inbox"])
     L --> DDB[("DynamoDB archive")]
     DDB --> A["archive Lambda<br/>Function URL"] --> SPA["run-log SPA<br/>Amplify"]
-    S3[("S3 artifact bucket")] -. "code via REFERENCE" .-> L
 ```
 
-Six services, one CloudFormation template, no API Gateway (a Lambda Function URL is enough for a read-only endpoint). Function code ships via **Lambda self-managed S3 code storage** (`S3ObjectStorageMode: REFERENCE`, launched July 2026) — Lambda reads the zips straight from a versioned bucket in this account, no Lambda-managed copy, no code storage quota used.
+Six services, one CloudFormation template, no API Gateway (a Lambda Function URL is enough for a read-only endpoint). Function code is inline in the template — clone, deploy, done.
 
 ## Repo layout
 
 ```
 template.yaml        # the entire backend — deploy this
-src/scout/index.py   # the agent: fetch re:Post -> Bedrock -> SNS + DynamoDB
-src/archive/index.py # read-only archive endpoint behind a Function URL
+src/scout/index.py   # readable copy of the agent code (canonical copy is inline in template.yaml)
+src/archive/index.py # readable copy of the archive endpoint code
 frontend/index.html  # the run-log SPA — host on Amplify (or any static host)
-scripts/deploy.sh    # bootstrap bucket + upload + deploy + seed, one command
+scripts/deploy.sh    # deploy + seed + fetch outputs, one command
 docs/                # challenge article draft + screenshots
 ```
-
-## Built on a week-old launch
-
-The functions started as inline `ZipFile` code in the template — until the scout hit 3,527 of the 4,096-character inline limit and the roadmap (dedupe, better parsing) clearly wouldn't fit. Instead of pivoting to SAM packaging, this repo uses [Lambda self-managed S3 code storage](https://aws.amazon.com/about-aws/whats-new/2026/07/lambda-self-managed-code-storage/), announced days before the challenge: the deploy script uploads zips to a **versioned** bucket (versioning is required — Lambda pins the exact object version), grants `lambda.amazonaws.com` `s3:GetObject`/`s3:GetObjectVersion` scoped with an `aws:SourceAccount` condition, and the template sets `S3ObjectStorageMode: REFERENCE`. The bucket stays the single source of truth; every deploy is just a new object version.
 
 ## Deploy
 
@@ -51,7 +46,16 @@ Prereqs: AWS CLI configured, us-east-1 (or any Bedrock region), Nova Lite model 
 ./scripts/deploy.sh you@example.com
 ```
 
-The script bootstraps the versioned artifact bucket with the Lambda-principal bucket policy, zips `src/`, uploads (capturing S3 VersionIds), and deploys the stack with those versions pinned. Code change? Re-run it — new object versions, stack update, done.
+or manually:
+
+```bash
+aws cloudformation deploy \
+  --template-file template.yaml \
+  --stack-name repost-scout \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region us-east-1 \
+  --parameter-overrides RecipientEmail=you@example.com
+```
 
 Then:
 
@@ -74,6 +78,11 @@ Then:
 
 The agent prompt (inside `template.yaml`, in the scout Lambda) is opinionated on purpose: it knows my lanes, skips vague and billing-support posts, and is told to write "verify X" instead of inventing details. Edit it to sound like you.
 
+## Evidence it runs without you
+
+- The live run log — every entry stamped with its 07:00 IST run time
+- EventBridge Scheduler console showing `repost-scout-daily` and its next run
+- CloudWatch Logs for the *scheduled* invocations (not just the manual seed)
 
 ## Known limitations (v1)
 

@@ -4,9 +4,6 @@
 
 Built for the AWS Builder Center **Weekend Agent Challenge** (July 17–20, 2026).
 
-📄 Challenge article: _[link once published]_
-🌅 Live run log: **https://main.d3oaa48pp04ndi.amplifyapp.com/**
-
 ## Why
 
 I'm an AWS Community Builder and I try to answer questions on re:Post. "Try" is the honest word — some weeks five, some weeks zero, depending on whether I remember to go looking. Scout removes the remembering. I read one email over coffee, spend 15 minutes polishing the best outline, and post.

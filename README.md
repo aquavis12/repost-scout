@@ -5,13 +5,18 @@
 Built for the AWS Builder Center **Weekend Agent Challenge** (July 17–20, 2026).
 
 📄 Challenge article: _[link once published]_
-🌅 Live run log: _[https://main.d3oaa48pp04ndi.amplifyapp.com/frontend/index.html]
+🌅 Live run log: **https://main.d3oaa48pp04ndi.amplifyapp.com/**
 
 ## Why
 
 I'm an AWS Community Builder and I try to answer questions on re:Post. "Try" is the honest word — some weeks five, some weeks zero, depending on whether I remember to go looking. Scout removes the remembering. I read one email over coffee, spend 15 minutes polishing the best outline, and post.
 
 ## Architecture
+
+![re:Post Scout architecture](docs/architecture/architecture.png)
+
+<details>
+<summary>Diagram source (Mermaid)</summary>
 
 ```mermaid
 flowchart TD
@@ -25,6 +30,8 @@ flowchart TD
     DDB --> A["archive Lambda<br/>Function URL"] --> SPA["run-log SPA<br/>Amplify"]
 ```
 
+</details>
+
 Six services, one CloudFormation template, no API Gateway (a Lambda Function URL is enough for a read-only endpoint). Function code is inline in the template — clone, deploy, done.
 
 ## Repo layout
@@ -35,7 +42,7 @@ src/scout/index.py   # readable copy of the agent code (canonical copy is inline
 src/archive/index.py # readable copy of the archive endpoint code
 frontend/index.html  # the run-log SPA — host on Amplify (or any static host)
 scripts/deploy.sh    # deploy + seed + fetch outputs, one command
-docs/                # challenge article draft + screenshots
+docs/                # architecture diagram (PNG + .drawio + .mmd), article, screenshots
 ```
 
 ## Deploy

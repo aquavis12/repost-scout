@@ -5,7 +5,7 @@
 Built for the AWS Builder Center **Weekend Agent Challenge** (July 17–20, 2026).
 
 📄 Challenge article: _[link once published]_
-🌅 Live run log: _[Amplify URL once deployed]_
+🌅 Live run log: _[https://main.d3oaa48pp04ndi.amplifyapp.com/frontend/index.html]
 
 ## Why
 

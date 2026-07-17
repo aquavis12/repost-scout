@@ -72,12 +72,19 @@
         transition:transform .18s ease}
   details[open] .chev{transform:rotate(90deg)}
   @media (prefers-reduced-motion:reduce){.chev{transition:none}}
-  pre{
-    font-family:var(--mono);font-size:.84rem;line-height:1.7;color:var(--ink);
-    white-space:pre-wrap;word-break:break-word;
-    padding:4px 18px 20px;border-top:1px solid var(--line);margin-top:0
+  .brief{
+    font-size:.9rem;line-height:1.65;color:var(--ink);
+    padding:4px 18px 20px;border-top:1px solid var(--line);word-break:break-word
   }
-  pre a{color:var(--dawn)}
+  .brief h3{font-size:1rem;font-weight:700;margin:18px 0 8px;color:var(--dawn)}
+  .brief h4{font-size:.9rem;font-weight:600;margin:16px 0 6px}
+  .brief p{margin:8px 0}
+  .brief ul{margin:6px 0 10px 2px;padding-left:20px}
+  .brief li{margin:4px 0}
+  .brief strong{color:var(--dawn);font-weight:600}
+  .brief a{color:var(--dawn);word-break:break-all}
+  .brief hr{border:none;border-top:1px dashed var(--line);margin:16px 0}
+  .brief code{font-family:var(--mono);font-size:.82rem}
   .empty,.error{
     border:1px dashed var(--line);border-radius:10px;padding:28px 22px;
     color:var(--muted);font-size:.92rem
@@ -125,6 +132,43 @@ const API_URL = "https://4xd2akitvunckc6fahslyru4r40hznyg.lambda-url.us-east-1.o
 const status = document.getElementById("status");
 const log = document.getElementById("log");
 
+
+function esc(t){
+  return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+          .replace(/"/g,"&quot;");
+}
+function inline(t){
+  t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+  t = t.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  return t;
+}
+function renderBrief(raw){
+  const lines = esc(raw).split("\n");
+  let html = "", inList = false, para = [];
+  const flushPara = () => {
+    if(para.length){ html += "<p>"+inline(para.join(" "))+"</p>"; para = []; }
+  };
+  const closeList = () => { if(inList){ html += "</ul>"; inList = false; } };
+  for(const line of lines){
+    const t = line.trim();
+    if(!t){ flushPara(); closeList(); continue; }
+    if(t === "---"){ flushPara(); closeList(); html += "<hr>"; continue; }
+    let m;
+    if((m = t.match(/^####\s+(.*)/))){ flushPara(); closeList(); html += "<h4>"+inline(m[1])+"</h4>"; continue; }
+    if((m = t.match(/^###\s+(.*)/))){ flushPara(); closeList(); html += "<h3>"+inline(m[1])+"</h3>"; continue; }
+    if((m = t.match(/^[-•]\s+(.*)/))){
+      flushPara();
+      if(!inList){ html += "<ul>"; inList = true; }
+      html += "<li>"+inline(m[1])+"</li>"; continue;
+    }
+    if(inList && t.startsWith("http")){ html += "<li>"+inline(t)+"</li>"; continue; }
+    closeList(); para.push(t);
+  }
+  flushPara(); closeList();
+  return html;
+}
+
 function fmtIST(iso){
   if(!iso) return "07:00 IST";
   try{
@@ -151,9 +195,10 @@ function render(runs){
     s.innerHTML = '<span class="run-date">'+r.run_date+'</span>'
       + '<span class="run-meta">ran while you slept · '+fmtIST(r.run_at_utc)
       + ' · <b>'+r.candidates+'</b> candidates</span><span class="chev" aria-hidden="true">›</span>';
-    const pre = document.createElement("pre");
-    pre.textContent = r.brief || "(empty brief)";
-    d.append(s,pre);
+    const div = document.createElement("div");
+    div.className = "brief";
+    div.innerHTML = renderBrief(r.brief || "(empty brief)");
+    d.append(s,div);
     log.appendChild(d);
   });
 }

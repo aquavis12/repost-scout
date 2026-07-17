@@ -1,0 +1,214 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  re:Post Scout v2 - always-on agent (07:00 IST) that finds unanswered
+  re:Post questions, drafts answer outlines with Bedrock Nova Lite, emails
+  the brief via SNS, and archives every brief to DynamoDB. A read-only
+  Lambda Function URL serves the archive to a static SPA on Amplify Hosting.
+
+Parameters:
+  RecipientEmail:
+    Type: String
+    Description: Where the daily brief lands (confirm one SNS subscription email after deploy)
+  Topics:
+    Type: String
+    Default: "bedrock,fargate,cost optimization,cloudformation"
+    Description: Comma-separated re:Post search terms (your lanes)
+  ScheduleExpression:
+    Type: String
+    Default: "cron(30 1 * * ? *)"
+    Description: 01:30 UTC = 07:00 IST daily
+  ModelId:
+    Type: String
+    Default: "amazon.nova-lite-v1:0"
+    Description: Bedrock model for ranking + drafting
+
+  ArtifactBucket:
+    Type: String
+    Description: Versioned S3 bucket holding the deployment zips (created by scripts/deploy.sh)
+  ScoutObjectVersion:
+    Type: String
+    Description: S3 VersionId of scout.zip (printed by scripts/deploy.sh)
+  ArchiveObjectVersion:
+    Type: String
+    Description: S3 VersionId of archive.zip (printed by scripts/deploy.sh)
+
+Resources:
+
+  BriefTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: repost-scout-brief
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref RecipientEmail
+
+  BriefsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: repost-scout-briefs
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: run_date
+          AttributeType: S
+      KeySchema:
+        - AttributeName: run_date
+          KeyType: HASH
+
+  ScoutRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: repost-scout-lambda-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: repost-scout
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
+              - Effect: Allow
+                Action: bedrock:InvokeModel
+                Resource: !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/*
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref BriefTopic
+              - Effect: Allow
+                Action: dynamodb:PutItem
+                Resource: !GetAtt BriefsTable.Arn
+
+  ScoutFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: repost-scout
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt ScoutRole.Arn
+      Timeout: 120
+      MemorySize: 256
+      Environment:
+        Variables:
+          TOPICS: !Ref Topics
+          TOPIC_ARN: !Ref BriefTopic
+          TABLE: !Ref BriefsTable
+          MODEL_ID: !Ref ModelId
+      Code:
+        S3Bucket: !Ref ArtifactBucket
+        S3Key: scout.zip
+        S3ObjectVersion: !Ref ScoutObjectVersion
+        S3ObjectStorageMode: REFERENCE
+
+  ArchiveRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: repost-scout-archive-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: read-briefs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
+              - Effect: Allow
+                Action: dynamodb:Scan
+                Resource: !GetAtt BriefsTable.Arn
+
+  ArchiveFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: repost-scout-archive
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt ArchiveRole.Arn
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          TABLE: !Ref BriefsTable
+      Code:
+        S3Bucket: !Ref ArtifactBucket
+        S3Key: archive.zip
+        S3ObjectVersion: !Ref ArchiveObjectVersion
+        S3ObjectStorageMode: REFERENCE
+
+  ArchiveUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt ArchiveFunction.Arn
+      AuthType: NONE
+      Cors:
+        AllowOrigins: ["*"]
+        AllowMethods: ["GET"]
+
+  ArchiveUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ArchiveFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: repost-scout-scheduler-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: scheduler.amazonaws.com }
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: invoke-scout
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt ScoutFunction.Arn
+
+  MorningSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: repost-scout-daily
+      Description: Fires re:Post Scout at 07:00 IST every day
+      ScheduleExpression: !Ref ScheduleExpression
+      ScheduleExpressionTimezone: UTC
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      State: ENABLED
+      Target:
+        Arn: !GetAtt ScoutFunction.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+        RetryPolicy:
+          MaximumRetryAttempts: 2
+
+Outputs:
+  FunctionName:
+    Value: !Ref ScoutFunction
+  ArchiveApiUrl:
+    Description: Paste this into API_URL at the top of index.html
+    Value: !GetAtt ArchiveUrl.FunctionUrl
+  TestCommand:
+    Value: !Sub aws lambda invoke --function-name ${ScoutFunction} --region ${AWS::Region} /tmp/out.json

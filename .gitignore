@@ -1,0 +1,4 @@
+# local
+*.zip
+out.json
+.DS_Store

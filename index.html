@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>re:Post Scout — run log</title>
+<meta name="description" content="Archive of every morning brief the re:Post Scout agent produced while its owner slept.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --night:#0b1220;        /* pre-dawn sky */
+    --panel:#111a2c;
+    --line:rgba(232,237,246,.10);
+    --ink:#e8edf6;
+    --muted:#8b98af;
+    --dawn:#f2a65a;         /* first light */
+    --dawn-deep:#c96f2e;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --sans:'Sora',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  html{color-scheme:dark}
+  body{
+    background:var(--night);color:var(--ink);font-family:var(--sans);
+    font-size:16px;line-height:1.6;min-height:100vh;
+  }
+  /* signature: dawn breaking over the page edge */
+  .horizon{
+    height:3px;width:100%;
+    background:linear-gradient(90deg,var(--night) 0%,#22335a 35%,var(--dawn-deep) 70%,var(--dawn) 100%);
+  }
+  .wrap{max-width:720px;margin:0 auto;padding:56px 24px 80px}
+  header{margin-bottom:8px}
+  .agent-line{display:flex;align-items:center;gap:10px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--dawn);flex:none;
+       box-shadow:0 0 12px 2px rgba(242,166,90,.45);animation:pulse 2.6s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.35}}
+  @media (prefers-reduced-motion:reduce){.dot{animation:none}}
+  h1{font-size:1.5rem;font-weight:700;letter-spacing:-.01em}
+  .tagline{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-top:6px}
+  .tagline b{color:var(--dawn);font-weight:500}
+  .status{
+    font-family:var(--mono);font-size:.8rem;color:var(--muted);
+    border:1px solid var(--line);border-radius:8px;padding:10px 14px;
+    margin:28px 0 40px;background:var(--panel)
+  }
+  .status .ok{color:var(--dawn)}
+  .log-label{
+    font-family:var(--mono);font-size:.72rem;text-transform:uppercase;
+    letter-spacing:.14em;color:var(--muted);margin-bottom:14px
+  }
+  details{
+    border:1px solid var(--line);border-radius:10px;background:var(--panel);
+    margin-bottom:14px;overflow:hidden
+  }
+  summary{
+    list-style:none;cursor:pointer;padding:16px 18px;
+    display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px
+  }
+  summary::-webkit-details-marker{display:none}
+  summary:focus-visible{outline:2px solid var(--dawn);outline-offset:-2px;border-radius:10px}
+  .run-date{
+    font-family:var(--mono);font-weight:500;font-size:.95rem;
+    border-bottom:2px solid;
+    border-image:linear-gradient(90deg,var(--dawn-deep),var(--dawn)) 1
+  }
+  .run-meta{font-family:var(--mono);font-size:.78rem;color:var(--muted)}
+  .run-meta b{color:var(--ink);font-weight:500}
+  .chev{margin-left:auto;color:var(--muted);font-family:var(--mono);font-size:.8rem;
+        transition:transform .18s ease}
+  details[open] .chev{transform:rotate(90deg)}
+  @media (prefers-reduced-motion:reduce){.chev{transition:none}}
+  .brief{
+    font-size:.9rem;line-height:1.65;color:var(--ink);
+    padding:4px 18px 20px;border-top:1px solid var(--line);word-break:break-word
+  }
+  .brief h3{font-size:1rem;font-weight:700;margin:18px 0 8px;color:var(--dawn)}
+  .brief h4{font-size:.9rem;font-weight:600;margin:16px 0 6px}
+  .brief p{margin:8px 0}
+  .brief ul{margin:6px 0 10px 2px;padding-left:20px}
+  .brief li{margin:4px 0}
+  .brief strong{color:var(--dawn);font-weight:600}
+  .brief a{color:var(--dawn);word-break:break-all}
+  .brief hr{border:none;border-top:1px dashed var(--line);margin:16px 0}
+  .brief code{font-family:var(--mono);font-size:.82rem}
+  .empty,.error{
+    border:1px dashed var(--line);border-radius:10px;padding:28px 22px;
+    color:var(--muted);font-size:.92rem
+  }
+  .error{border-color:rgba(242,166,90,.4)}
+  .error code{font-family:var(--mono);font-size:.82rem;color:var(--dawn)}
+  footer{
+    margin-top:56px;padding-top:20px;border-top:1px solid var(--line);
+    font-family:var(--mono);font-size:.75rem;color:var(--muted);
+    display:flex;flex-wrap:wrap;gap:6px 18px
+  }
+  footer a{color:var(--muted)}
+  footer a:hover,footer a:focus-visible{color:var(--dawn)}
+</style>
+</head>
+<body>
+<div class="horizon" aria-hidden="true"></div>
+<div class="wrap">
+
+  <header>
+    <div class="agent-line">
+      <span class="dot" aria-hidden="true"></span>
+      <h1>re:Post Scout</h1>
+    </div>
+    <p class="tagline">an agent that runs <b>while you sleep</b> · daily 07:00 IST · finds unanswered AWS re:Post questions and drafts the answers</p>
+  </header>
+
+  <div class="status" id="status" role="status">connecting to archive…</div>
+
+  <p class="log-label">Run log — newest first</p>
+  <div id="log" aria-live="polite"></div>
+
+  <footer>
+    <span>Weekend Agent Challenge · July 2026</span>
+    <a href="https://github.com/aquavis12/repost-scout">source on GitHub</a>
+    <span>EventBridge Scheduler → Lambda → Bedrock Nova → SNS + DynamoDB</span>
+  </footer>
+
+</div>
+
+<script>
+// Paste the ArchiveApiUrl output from the CloudFormation stack here:
+const API_URL = "https://4xd2akitvunckc6fahslyru4r40hznyg.lambda-url.us-east-1.on.aws/";
+
+const status = document.getElementById("status");
+const log = document.getElementById("log");
+
+
+function esc(t){
+  return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+          .replace(/"/g,"&quot;");
+}
+function inline(t){
+  t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+  t = t.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  return t;
+}
+function renderBrief(raw){
+  const lines = esc(raw).split("\n");
+  let html = "", inList = false, para = [];
+  const flushPara = () => {
+    if(para.length){ html += "<p>"+inline(para.join(" "))+"</p>"; para = []; }
+  };
+  const closeList = () => { if(inList){ html += "</ul>"; inList = false; } };
+  for(const line of lines){
+    const t = line.trim();
+    if(!t){ flushPara(); closeList(); continue; }
+    if(t === "---"){ flushPara(); closeList(); html += "<hr>"; continue; }
+    let m;
+    if((m = t.match(/^####\s+(.*)/))){ flushPara(); closeList(); html += "<h4>"+inline(m[1])+"</h4>"; continue; }
+    if((m = t.match(/^###\s+(.*)/))){ flushPara(); closeList(); html += "<h3>"+inline(m[1])+"</h3>"; continue; }
+    if((m = t.match(/^[-•]\s+(.*)/))){
+      flushPara();
+      if(!inList){ html += "<ul>"; inList = true; }
+      html += "<li>"+inline(m[1])+"</li>"; continue;
+    }
+    if(inList && t.startsWith("http")){ html += "<li>"+inline(t)+"</li>"; continue; }
+    closeList(); para.push(t);
+  }
+  flushPara(); closeList();
+  return html;
+}
+
+function fmtIST(iso){
+  if(!iso) return "07:00 IST";
+  try{
+    return new Date(iso).toLocaleTimeString("en-IN",
+      {timeZone:"Asia/Kolkata",hour:"2-digit",minute:"2-digit",hour12:false})+" IST";
+  }catch(e){ return "07:00 IST"; }
+}
+
+function render(runs){
+  if(!runs.length){
+    status.textContent = "agent deployed — no runs recorded yet";
+    log.innerHTML = '<div class="empty">Nothing here yet. The schedule fires at 07:00 IST — '
+      + 'come back after the first morning, or invoke the Lambda once to seed the log.</div>';
+    return;
+  }
+  const latest = runs[0];
+  status.innerHTML = 'last run <span class="ok">' + latest.run_date + " · " + fmtIST(latest.run_at_utc)
+    + "</span> — " + latest.candidates + " candidate question" + (latest.candidates===1?"":"s")
+    + " found · " + runs.length + " morning" + (runs.length===1?"":"s") + " on record";
+  runs.forEach((r,i)=>{
+    const d = document.createElement("details");
+    if(i===0) d.open = true;
+    const s = document.createElement("summary");
+    s.innerHTML = '<span class="run-date">'+r.run_date+'</span>'
+      + '<span class="run-meta">ran while you slept · '+fmtIST(r.run_at_utc)
+      + ' · <b>'+r.candidates+'</b> candidates</span><span class="chev" aria-hidden="true">›</span>';
+    const div = document.createElement("div");
+    div.className = "brief";
+    div.innerHTML = renderBrief(r.brief || "(empty brief)");
+    d.append(s,div);
+    log.appendChild(d);
+  });
+}
+
+async function load(){
+  if(API_URL.startsWith("REPLACE")){
+    status.textContent = "not configured";
+    log.innerHTML = '<div class="error">Set <code>API_URL</code> at the top of this file to the '
+      + '<code>ArchiveApiUrl</code> output of the CloudFormation stack, then redeploy.</div>';
+    return;
+  }
+  try{
+    const res = await fetch(API_URL);
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const data = await res.json();
+    render(data.runs || []);
+  }catch(e){
+    status.textContent = "archive unreachable";
+    log.innerHTML = '<div class="error">Could not load the run log (<code>'+e.message
+      + '</code>). Check that the Function URL is correct and the stack is deployed.</div>';
+  }
+}
+load();
+</script>
+</body>
+</html>

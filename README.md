@@ -13,23 +13,17 @@ I'm an AWS Community Builder and I try to answer questions on re:Post. "Try" is 
 
 ## Architecture
 
-```
-EventBridge Scheduler ── cron(30 1 * * ? *) = 07:00 IST daily
-        │
-        ▼
-  Lambda "repost-scout" (Python 3.12, code inline in CloudFormation)
-        │  1. GET repost.aws/questions?view=unanswered&sort=recent&search=<topic>
-        │  2. extract question links (regex on /questions/QU.../slug)
-        │  3. one Bedrock Converse call: rank all candidates, draft top-3 outlines
-        │
-        ├──▶ Amazon SNS ──▶ email brief to my inbox
-        └──▶ DynamoDB "repost-scout-briefs" ── one item per morning
-                    │
-                    ▼
-        Lambda "repost-scout-archive" + Function URL (read-only, CORS)
-                    │
-                    ▼
-        frontend/index.html ── static SPA on Amplify Hosting
+```mermaid
+flowchart TD
+    EB["EventBridge Scheduler<br/>07:00 IST daily"] --> L["Lambda: repost-scout"]
+    L --> RP["re:Post<br/>unanswered questions"]
+    RP --> L
+    L --> BR["Bedrock Nova Lite<br/>rank + draft top 3"]
+    BR --> L
+    L --> SNS["SNS"] --> INBOX(["your inbox"])
+    L --> DDB[("DynamoDB archive")]
+    DDB --> A["archive Lambda<br/>Function URL"] --> SPA["run-log SPA<br/>Amplify"]
+    S3[("S3 artifact bucket")] -. "code via REFERENCE" .-> L
 ```
 
 Six services, one CloudFormation template, no API Gateway (a Lambda Function URL is enough for a read-only endpoint). Function code ships via **Lambda self-managed S3 code storage** (`S3ObjectStorageMode: REFERENCE`, launched July 2026) — Lambda reads the zips straight from a versioned bucket in this account, no Lambda-managed copy, no code storage quota used.
@@ -80,11 +74,6 @@ Then:
 
 The agent prompt (inside `template.yaml`, in the scout Lambda) is opinionated on purpose: it knows my lanes, skips vague and billing-support posts, and is told to write "verify X" instead of inventing details. Edit it to sound like you.
 
-## Evidence it runs without you
-
-- The live run log — every entry stamped with its 07:00 IST run time
-- EventBridge Scheduler console showing `repost-scout-daily` and its next run
-- CloudWatch Logs for the *scheduled* invocations (not just the manual seed)
 
 ## Known limitations (v1)
 
